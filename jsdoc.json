@@ -1,0 +1,42 @@
+{
+  "source": {
+    "include": [
+      ".",
+      "README.md",
+      "package.json"
+    ],
+    "includePattern": ".js$",
+    "excludePattern": "(node_modules|docs)"
+  },
+  "tags": {
+    "allowUnknownTags": [],
+    "dictionaries": [
+      "jsdoc"
+    ]
+  },
+  "opts": {
+    "destination": "./docs/",
+    "template": "./node_modules/better-docs",
+    "recurse": true
+  },
+  "templates": {
+    "default": {
+      "staticFiles": {
+        "include": [
+          "./docs-src/statics"
+        ]
+      }
+    },
+    "better-docs": {
+      "name": "BC-Err",
+      "hideGenerator": false,
+      "logo": "images/logo.png",
+      "navigation": [
+        {
+          "label": "GitHub",
+          "href": "http://localhost"
+        }
+      ]
+    }
+  }
+}

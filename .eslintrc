@@ -1,0 +1,54 @@
+{
+  "extends": [
+    "airbnb-base",
+    "plugin:jsdoc/recommended",
+    "plugin:jest/recommended"
+  ],
+  "parserOptions": {
+    "ecmaVersion": 2018,
+    "sourceType": "module"
+  },
+  "rules": {
+    "no-console": [
+      "off"
+    ],
+    "no-underscore-dangle": "off",
+    "no-use-before-define": "off",
+    "linebreak-style": "off",
+    "func-style": "off",
+    "no-plusplus": "off",
+    "no-else-return": "off",
+    "one-var": "off",
+    "import/no-dynamic-require": "off",
+    "max-len": "off",
+    "require-await": "error"
+  },
+  "overrides": [
+    {
+      "files": ["*-test.js","*.spec.js"],
+      "rules": {
+        "no-unused-vars": "off",
+        "jest/no-try-expect": "off"
+      }
+    }
+  ],
+  "settings": {
+    "jsdoc": {
+      "tagNamePreference": {
+        "augments": {
+          "message": "@extends is to be used over @augments as it is more evocative of classes than @augments",
+          "replacement": "extends"
+        }
+      }
+    }
+  },
+  "env": {
+    "jest/globals": true,
+    "jest": true,
+    "node": true
+  },
+  "plugins": [
+    "jsdoc",
+    "jest"
+  ]
+}
