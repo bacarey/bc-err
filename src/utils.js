@@ -28,5 +28,11 @@ const toJSIdentifier = (str) => {
  */
 const castArray = (val) => (Array.isArray(val) ? val : [val]);
 
+const splitCamelCase = (s) => s.replace(
+  /^[a-z]|^([A-Z]+)(?=[A-Z]|$)|([A-Z])+(?=[A-Z]|$)|([A-Z])(?=[a-z]+)/g,
+  (m) => ` ${m.toUpperCase()}`,
+).trim();
+
 exports.toJSIdentifier = toJSIdentifier;
 exports.toArray = castArray;
+exports.splitCamelCase = splitCamelCase;

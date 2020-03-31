@@ -27,6 +27,7 @@ const statuses = {
   isServer: (code) => Math.floor(Number(code) / 100) === 5,
   isEmpty: (code) => [204, 205, 304].includes(Number(code)),
   shouldRetry: (code) => [404, 408, 412, 423, 424, 425, 428, 429, 502, 503, 504].includes(Number(code)),
+  getStatusType: (status) => Math.floor(status / 100) * 100,
 };
 
 populateStatuses();

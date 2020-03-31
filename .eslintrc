@@ -25,7 +25,10 @@
   },
   "overrides": [
     {
-      "files": ["*-test.js","*.spec.js"],
+      "files": [
+        "*-test.js",
+        "*.spec.js"
+      ],
       "rules": {
         "no-unused-vars": "off",
         "jest/no-try-expect": "off"

@@ -2,6 +2,7 @@ const { createErrorClass } = require('../index');
 
 describe('createErrorClass()', () => {
   test('creates an Error class', () => {
+    // noinspection LocalVariableNamingConventionJS
     const NewClass = createErrorClass(418, 'SomeError');
     const newError = new NewClass('This is a test message.');
     expect(newError.isBCError).toBeTruthy();
