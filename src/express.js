@@ -1,9 +1,25 @@
 const { errors } = require('./errors');
+
 /**
  * This is  custom error handler for express.  It just gives us a little more control over the output.
  *
  * @param {boolean} options - True if the custom error handler should include the stack.
  * @returns {function(boolean)} - The custom error handler middleware.
+ * @example
+ * const { errors, errorHandler } = require('bc-err');
+ * const express = require('express');
+ *
+ * const app = express();
+ *
+ * app.get('/brew/coffee', (req, res) => {
+ *   throw new errors.HTTP418Error('No coffee for you!');
+ * });
+ *
+ * app.use(errorHandler());
+ *
+ * app.listen(5000, () => {
+ *   console.log('Listening on port 5000');
+ * });
  */
 const errorHandler = (options) => defaultFormatter(options);
 
@@ -11,7 +27,7 @@ const errorHandler = (options) => defaultFormatter(options);
 /**
  * This is the default formatter that express.send() and middleware will use.
  *
- * @param {object} options - TODO:
+ * @param {object} options - A dictionary of options used to control how error object are formatted for the Express response
  * @returns {Function} - The default formatter function.
  * @private
  */

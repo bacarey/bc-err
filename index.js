@@ -4,12 +4,16 @@ const {
   createErrorClass,
   throwByClassName,
   makeAndExportAllHTTPErrorClasses,
+  makeHTTPErrorClassByCode,
+  makeHTTPErrorClassByName,
 } = require('./src/errors');
 
 module.exports = {
-  express,
+  errorHandler: express.errorHandler,
   errors,
   createErrorClass,
   throwByClassName,
   makeAndExportAllHTTPErrorClasses,
+  makeHTTPErrorClassByCode,
+  makeHTTPErrorClassByName,
 };

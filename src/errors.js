@@ -4,8 +4,6 @@ const statuses = require('./statuses');
 const HTTPError = require('./HTTPError');
 const explanations = require('./explanations');
 
-const localErrors = {};
-
 /**
  * Creates a new class, extended from a base class
  *
@@ -84,9 +82,9 @@ const createErrorClass = (code, name = '', options = {}) => {
   newClass.prototype.explanation = classOptions.explanation || '';
   newClass.prototype.suggestion = classOptions.suggestion || '';
   newClass.prototype.statusType = statuses.getStatusType(code);
-  newClass.prototype.parent = 'HTTPError';
+  newClass.prototype.parentClass = 'HTTPError';
 
-  Object.entries(classOptions).filter(([optKey]) => !(['code', 'name', 'explanation', 'suggestion', 'parent', 'extendedClassName', 'noAutoCache'].includes(optKey))).forEach(([key, value]) => {
+  Object.entries(classOptions).filter(([optKey]) => !(['code', 'name', 'explanation', 'suggestion', 'parentClass', 'extendedClassName', 'noAutoCache', 'noIDParse'].includes(optKey))).forEach(([key, value]) => {
     newClass.prototype[key] = value;
   });
 
@@ -133,7 +131,17 @@ const nameClass = (classDefinition, name) => {
 };
 
 /**
- * Populate the proxyErrors object with definitions for every error class.
+ * Create class definitions for all HTTP status codes (as defined in Node http.STATUS_CODES)
+ * and export them (via the Proxy). Each class can be referenced by its number or name.
+ *
+ * @example
+ * const { errors } = require('bc-err');
+ * errors.makeAndExportAllHTTPErrorClasses();
+ *
+ * error1 = new HTTP404Error('Thing one is unavailable.');
+ * error2 = new NotFoundError('Thing two is unavailable.');
+ *
+ * // error1 and error2 are both 404 errors.  BC-err just gives you these two ways to reference the same thing.
  */
 const makeAndExportAllHTTPErrorClasses = () => {
   statuses.codes.forEach((code) => {
@@ -144,6 +152,18 @@ const makeAndExportAllHTTPErrorClasses = () => {
   });
 };
 
+/**
+ * Defines a new class extended from HTTPError class for the status code supplied.
+ *
+ * @param {number} code - The status/error code of this error type
+ * @param {object.<string, *>} options - A KVP of additional options for this class
+ * @returns {{}} The newly defined class
+ * @example
+ * const { errors } = require('bc-err');
+ *
+ * errors.makeHTTPErrorClassByCode(642, {defaultMessage: 'The answer to the ultimate question of life, the universe, and everything was calculated. Missing question.'});
+ * throw new errors.HTTP642Error('Please restate the question.');
+ */
 const makeHTTPErrorClassByCode = (code, options = {}) => {
   const className = makeValidErrorClassName(toJSIdentifier(statuses[code]));
   const classOptions = { ...options };
@@ -151,27 +171,54 @@ const makeHTTPErrorClassByCode = (code, options = {}) => {
   return createErrorClass(Number(code), className, options);
 };
 
+/**
+ * Defines a new class extended from HTTPError class for the class name supplied.
+ *
+ * @param {string} shortName - The name of the error that will be used to build the class name
+ * @param {object.<string, *>} options - A KVP of additional options for this class
+ * @returns {{}} The newly defined class
+ * @example
+ * const { errors } = require('bc-err');
+ *
+ * errors.makeHTTPErrorClassByName('Missing Question', {defaultMessage: 'The answer to the ultimate question of life, the universe, and everything was calculated. Missing question.'});
+ * throw new errors.MissingQuestionError('Please restate the question.');
+ */
 const makeHTTPErrorClassByName = (shortName, options = {}) => {
+  const safeName = toJSIdentifier(shortName);
   const foundCode = Object.keys(statuses).filter((key) => Number(key).toString() === key).find((code) => {
     const candidate = toJSIdentifier(statuses[code]);
-    return candidate.toLowerCase() === shortName.toLowerCase();
+    return candidate.toLowerCase() === safeName.toLowerCase();
   });
+  let newClass;
   if (foundCode) {
-    makeHTTPErrorClassByCode(Number(foundCode), options);
+    newClass = makeHTTPErrorClassByCode(Number(foundCode), options);
   } else {
-    const validName = shortName.toLowerCase().endsWith('error') ? shortName : `${shortName}Error`;
-
-    createErrorClass(500, validName, { noIDParse: true });
+    const validName = safeName.toLowerCase().endsWith('error') ? safeName : `${safeName}Error`;
+    newClass = createErrorClass(500, validName, { noIDParse: true, ...options });
   }
+  return newClass;
 };
 
+/**
+ * A convenience method that instantiates the named error class with the passed arguments and throws that error.
+ *
+ * @param {string} errorClassName - The name of the error class we are instantiating to throw.
+ * @param {...string|number|object|Error} args - The arguments to pass to the constructo of the error class we are instantiating.
+ * @example
+ * const { throwByClasName } = require('bc-err');
+ * throwByClassName('TemporalParadoxErrror', 'A causal loop was detected.', 699)
+ */
 const throwByClassName = (errorClassName, ...args) => {
   // noinspection LocalVariableNamingConventionJS
   const ErrorClass = proxyErrors[errorClassName];
   throw new ErrorClass(...args);
 };
 
-const proxyErrors = new Proxy(localErrors, {
+/**
+ * By exporting a proxy to localErrors, we are able to intercept references to properties (i.e. error classes)
+ * that don't yet exist.  Then, we create them, if we can, so we don't have to do it again.
+ */
+const proxyErrors = new Proxy({}, {
   get(target, name) {
     let errorName;
     let code;
@@ -189,22 +236,23 @@ const proxyErrors = new Proxy(localErrors, {
       if (code) {
         errorClassDef = makeHTTPErrorClassByCode(code);
         proxyErrors[`HTTP${code}Error`] = errorClassDef;
-      } else {
+      } else if (errorName) {
         const foundCode = Object.keys(statuses).filter((key) => Number(key).toString() === key).find((errCode) => {
           const candidate = toJSIdentifier(statuses[errCode]);
           return candidate.toLowerCase() === errorName.toLowerCase();
         });
         if (foundCode) {
-          errorClassDef = makeHTTPErrorClassByCode(foundCode);
+          errorClassDef = makeHTTPErrorClassByCode(Number(foundCode));
           proxyErrors[`HTTP${code}Error`] = errorClassDef;
         } else {
           errorClassDef = makeHTTPErrorClassByName(name);
           proxyErrors[name] = errorClassDef;
         }
       }
-      // exportErrorClass(errorClassDef, name, code);
-      // proxyErrors[`HTTP${code}Error`] = errorClass;
-      // proxyErrors[className] = errorClass;
+    }
+
+    if (target[name] === undefined) {
+      throw new TypeError(`${name} is undefined. You may need to create it, first.`);
     }
     return Reflect.get(target, name);
   },
@@ -214,6 +262,8 @@ module.exports = proxyErrors;
 module.exports = {
   errors: proxyErrors,
   makeAndExportAllHTTPErrorClasses,
+  makeHTTPErrorClassByCode,
+  makeHTTPErrorClassByName,
   createErrorClass,
   throwByClassName,
 };

@@ -14,8 +14,10 @@ const removeNonWordCharacters = (str) => str.replace(/[^ _0-9a-z]/gi, '');
  */
 const toJSIdentifier = (str) => {
   let retval = removeNonWordCharacters(str);
-  retval = capitalizeEveryWord(retval);
-  retval = removeWhitespace(retval);
+  if (/\s/m.test(retval)) {
+    retval = capitalizeEveryWord(retval);
+    retval = removeWhitespace(retval);
+  }
   return retval;
 };
 
