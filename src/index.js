@@ -1,4 +1,4 @@
-const express = require('./src/express');
+const express = require('./express');
 const {
   errors,
   createErrorClass,
@@ -6,10 +6,10 @@ const {
   makeAndExportAllHTTPErrorClasses,
   makeHTTPErrorClassByCode,
   makeHTTPErrorClassByName,
-} = require('./src/errors');
+} = require('./errors');
 
 module.exports = {
-  errorHandler: express.errorHandler,
+  makeErrorHandler: express.makeErrorHandler,
   errors,
   createErrorClass,
   throwByClassName,

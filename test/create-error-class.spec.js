@@ -1,4 +1,4 @@
-const { createErrorClass } = require('../index');
+const { createErrorClass } = require('../src');
 
 describe('createErrorClass()', () => {
   test('creates an Error class', () => {

@@ -7,7 +7,7 @@ const explanations = require('./explanations');
 /**
  * Creates a new class, extended from a base class
  *
- * @param {number} code - The error code
+ * @param {number} statusCode - The error code
  * @param {string} name - The name of the new class. If it does not end with "Error", that will be appended to the class name.
  * @param {object<string, *>} options - A KVP object containing additional options for this class.
  * @returns {object} The definition of the new class
@@ -31,9 +31,63 @@ const explanations = require('./explanations');
  * // Error: Causal loop detected.
  * //   <stacktrace>
  */
-const createErrorClass = (code, name = '', options = {}) => {
-  if (typeof code !== 'number') {
-    throw new TypeError('Missing a required parameter or parameter is not a number: code');
+const createErrorClass = (statusCode, name = '', options = {}) => {
+  validateCreateErrorClassParams(statusCode, name, options);
+
+  const classOptions = getClassOptions(statusCode, options);
+  const className = getClassName(name, statusCode, classOptions);
+
+  let newClass;
+  if (className) {
+    newClass = class extends HTTPError {
+      constructor(...args) {
+        const message = args.find((arg) => typeof arg === 'string');
+
+        if (!message) {
+          args.push(statuses[statusCode]);
+        }
+        super(...args);
+      }
+    };
+  }
+  if (newClass) {
+    nameClass(newClass, className);
+    newClass.prototype.defaultMessage = statuses[statusCode];
+    newClass.prototype.code = statusCode;
+    newClass.prototype.status = statusCode;
+    newClass.prototype.statusCode = statusCode;
+    newClass.prototype.explanation = classOptions.explanation || '';
+    newClass.prototype.suggestion = classOptions.suggestion || '';
+    newClass.prototype.statusType = statuses.getStatusType(statusCode);
+    newClass.prototype.parentClass = 'HTTPError';
+    newClass.prototype.fatal = !!classOptions.fatal;
+
+    Object.entries(classOptions).filter(([optKey]) => !(['code', 'name', 'explanation', 'suggestion', 'parentClass', 'extendedClassName', 'noAutoCache', 'noIDParse', 'fatal'].includes(optKey))).forEach(([key, value]) => {
+      newClass.prototype[key] = value;
+    });
+
+    if (!options.noAutoCache) {
+      if (classOptions.exportNumericClass) {
+        proxyErrors[`HTTP${statusCode}Error`] = newClass;
+      }
+      proxyErrors[className] = newClass;
+    }
+  }
+
+  return newClass;
+};
+
+/**
+ * Validates the parameters sent to createErrorClass. Just broken out into its own function for improved readability.
+ *
+ * @param {number} statusCode - The error code or HTTP status code that will be the default for the new class.
+ * @param {string} name - The class name to be used for the new error class.
+ * @param {{}} options - A dictionary of additional options used to create the class
+ * @private
+ */
+const validateCreateErrorClassParams = (statusCode, name, options) => {
+  if (typeof statusCode !== 'number') {
+    throw new TypeError('Missing a required parameter or parameter is not a number: statusCode');
   }
   if (typeof name !== 'string') {
     throw new TypeError(`The name parameter must be a string and not a ${typeof name}`);
@@ -41,61 +95,58 @@ const createErrorClass = (code, name = '', options = {}) => {
   if (typeof options !== 'object') {
     throw new TypeError(`The options parameter must be an object and not a ${typeof name}`);
   }
+};
 
-  const classOptions = { ...options };
-
+/**
+ * If needed, getClassName() comes up with a standardized class name, if one is not provided. This is called by createErrorClass()
+ * broken out for improved readability.
+ *
+ * @param {string} name - The name or partial name of the class to generate
+ * @param {number} statusCode - The error code or HTTP status code that will be the default for the new class.
+ * @param {{}} options - A dictionary of additional options used to create the class
+ * @returns {string} The new class name with standardized structure
+ * @private
+ */
+const getClassName = (name, statusCode, options) => {
   let className;
-  if (classOptions.noIDParse) {
-    className = name;
-  } else {
-    className = makeValidErrorClassName(name) || makeValidErrorClassName(statuses[code]) || makeValidErrorClassName(toJSIdentifier(statuses[code]));
-  }
-
-  classOptions.extendedClassName = classOptions.extendedClassName || 'HTTPError';
-
-  const explanation = explanations[code.toString()];
-  if (explanation && !options.defaultExplanation) {
-    classOptions.defaultExplanation = explanation;
-  }
-  if (statuses.shouldRetry(code) && !options.defaultSuggestion) {
-    classOptions.defaultSuggestion = options.suggestion || 'You might retry the request.';
-  }
-
-  const newClass = class extends HTTPError {
-    constructor(...args) {
-      const message = args.find((arg) => typeof arg === 'string');
-
-      if (!message) {
-        args.push(statuses[code]);
-      }
-      super(...args);
+  try {
+    if (options.noIDParse) {
+      className = name;
+    } else {
+      className = makeValidErrorClassName(name) || makeValidErrorClassName(statuses[statusCode]) || makeValidErrorClassName(toJSIdentifier(statuses[statusCode]));
     }
-  };
-
-  nameClass(newClass, className);
-
-  // newClass.prototype.defaultStatus = code;
-  newClass.prototype.defaultMessage = statuses[code];
-  newClass.prototype.code = code;
-  newClass.prototype.status = code;
-  newClass.prototype.statusCode = code;
-  newClass.prototype.explanation = classOptions.explanation || '';
-  newClass.prototype.suggestion = classOptions.suggestion || '';
-  newClass.prototype.statusType = statuses.getStatusType(code);
-  newClass.prototype.parentClass = 'HTTPError';
-
-  Object.entries(classOptions).filter(([optKey]) => !(['code', 'name', 'explanation', 'suggestion', 'parentClass', 'extendedClassName', 'noAutoCache', 'noIDParse'].includes(optKey))).forEach(([key, value]) => {
-    newClass.prototype[key] = value;
-  });
-
-  if (!options.noAutoCache) {
-    if (classOptions.exportNumericClass) {
-      proxyErrors[`HTTP${code}Error`] = newClass;
-    }
-    proxyErrors[className] = newClass;
+  } catch (e) {
+    console.error(`getClassName failed:\n${e.toString()}`);
+    className = '';
   }
+  return className;
+};
 
-  return newClass;
+/**
+ * Called by createErrorClass(), this applies a few default values to the options passed.
+ *
+ * @param {number} statusCode - The error code or HTTP status code that will be the default for the new class.
+ * @param {{}} options - A dictionary of additional options used to create the class
+ * @returns {{}} The options, after applying a few defaults.
+ * @private
+ */
+const getClassOptions = (statusCode, options) => {
+  const classOptions = { ...options };
+  const explanation = explanations[statusCode.toString()];
+
+  try {
+    classOptions.extendedClassName = classOptions.extendedClassName || 'HTTPError';
+
+    if (explanation && !options.defaultExplanation) {
+      classOptions.defaultExplanation = explanation;
+    }
+    if (statuses.shouldRetry(statusCode) && !options.defaultSuggestion) {
+      classOptions.defaultSuggestion = options.suggestion || 'You might retry the request.';
+    }
+  } catch (e) {
+    console.error(`getClassOptions failed:\n${e.toString()}`);
+  }
+  return classOptions;
 };
 
 /**

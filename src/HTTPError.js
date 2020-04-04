@@ -87,7 +87,7 @@ class HTTPError extends Error {
    * @returns {Array.<string>} - An array of property names
    */
   getFieldList(fieldLists = {}) {
-    const propBlacklist = ['name', 'message', 'statusCode', 'status', 'code', 'stack', 'defaultExplanation', 'defaultSuggestion', 'defaultMessage', 'defaultStatus', 'showStack', 'isBCError'];
+    const propBlacklist = ['name', 'message', 'statusCode', 'status', 'code', 'stack', 'defaultExplanation', 'defaultSuggestion', 'defaultMessage', 'defaultStatus', 'showStack', 'isBCError', 'fatal'];
     const propWhitelist = fieldLists.whitelist || [];
     const absoluteBlacklist = ['explanation', 'suggestion'];
     if (Array.isArray(fieldLists.blacklist)) {
@@ -116,34 +116,21 @@ class HTTPError extends Error {
    */
   toString(includeStack = true, fieldLists = {}) {
     const fields = this.getFieldList(fieldLists);
-    let retval = `${this.constructor.name}: ${this.message}\nCode: ${this.statusCode}`;
+    let retval = this.fatal ? 'FATAL ERROR\n\n' : '';
+    retval = `${retval}${this.constructor.name}: ${this.message}\nCode: ${this.statusCode}`;
     if (this.explanation && fields.includes('explanation')) {
       retval = `${retval}\nExplanation: ${this.explanation}`;
     }
     if (this.suggestion && fields.includes('suggestion')) {
       retval = `${retval}\nSuggestion: ${this.suggestion}`;
     }
-    // if (this.parentClass && fields.includes('parentClass')) {
-    //   retval = `${retval}\nParent Class: ${this.parentClass}`;
-    // }
+    if (this.originalError && fields.includes('originalError')) {
+      retval = `${retval}\nOriginal Error: asdf`;
+    }
 
     fields.forEach((field) => {
       retval = `${retval}\n${splitCamelCase(field)}: ${this[field]}`;
     });
-
-    // const propBlacklist = fieldLists.blacklist || ['name', 'message', 'statusCode', 'status', 'code', 'suggestion', 'explanation', 'stack', 'parentClass', 'defaultExplanation', 'defaultSuggestion', 'defaultMessage', 'showStack', 'isBCError'];
-    // const propWhitelist = fieldLists.whitelist || [];
-    // const absoluteBlacklist = ['explanation', 'suggestion'];
-    //
-    // if (propWhitelist.length) {
-    //   Object.keys(this).filter((key) => propWhitelist.includes(key) && !absoluteBlacklist.includes(key)).forEach((key) => {
-    //     retval = `${retval}\n${key}: ${this[key]}`;
-    //   }, this);
-    // } else {
-    //   Object.keys(this).filter((key) => !propBlacklist.includes(key) && !absoluteBlacklist.includes(key)).forEach((key) => {
-    //     retval = `${retval}\n${key}: ${this[key]}`;
-    //   }, this);
-    // }
 
     if (includeStack && this.showStack) {
       retval = `${retval}\n${this.stack}`;
@@ -163,6 +150,7 @@ class HTTPError extends Error {
       name: this.constructor.name,
       message: this.message,
       code: this.statusCode,
+      fatal: this.fatal,
       // stack: this.stack,
     };
     const fields = this.getFieldList(fieldLists);
@@ -178,7 +166,11 @@ class HTTPError extends Error {
     }
 
     fields.forEach((field) => {
-      formatted[field] = this[field];
+      if (field === 'originalError') {
+        formatted.originalError = this.originalError.toString();
+      } else {
+        formatted[field] = this[field];
+      }
     });
     if (includeStack) {
       formatted.stack = this.stack;

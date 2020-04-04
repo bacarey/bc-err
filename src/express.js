@@ -1,10 +1,11 @@
 const { errors } = require('./errors');
 
+// noinspection JSUnusedLocalSymbols
 /**
  * This is  custom error handler for express.  It just gives us a little more control over the output.
  *
- * @param {boolean} options - True if the custom error handler should include the stack.
- * @returns {function(boolean)} - The custom error handler middleware.
+ * @param {object} options - A dictionary of options used to control how error object are formatted for the Express response
+ * @returns {Function} - The custom error handler middleware.
  * @example
  * const { errors, errorHandler } = require('bc-err');
  * const express = require('express');
@@ -21,41 +22,39 @@ const { errors } = require('./errors');
  *   console.log('Listening on port 5000');
  * });
  */
-const errorHandler = (options) => defaultFormatter(options);
-
-// noinspection JSUnusedLocalSymbols
-/**
- * This is the default formatter that express.send() and middleware will use.
- *
- * @param {object} options - A dictionary of options used to control how error object are formatted for the Express response
- * @returns {Function} - The default formatter function.
- * @private
- */
 // eslint-disable-next-line no-unused-vars
-const defaultFormatter = (options) => (err, req, res, next) => {
+const makeErrorHandler = (options) => (err, req, res, next) => {
   const localOptions = { ...options };
-  let localError = err;
+  const localError = !err.isBCError ? new errors.HTTP500Error(err, 500) : err;
+  const status = localError.status || localError.statusCode || localError.code || 500;
 
-  if (!err.isBCError) {
-    localError = new errors.HTTP500Error(err, 500);
-  }
-  res.statusCode = localError.status;
+  res.statusCode = status < 400 ? 500 : status;
 
-  const accept = req.headers.accept || '';
+  const accept = req.headers.accept.toLowerCase() || '';
 
-  const showStack = localOptions.includeStack && (localError.showStack !== undefined && localError.showStack);
-  if (accept.includes('json')) {
+  const showStack = !!(localOptions.includeStack && (localError.showStack !== undefined && localError.showStack));
+  if (accept.includes('json') || accept.includes('*/*')) {
     res.setHeader('Content-Type', 'application/json');
-    const json = { error: localError.toJSON() };
-    if (showStack) {
-      json.error.stack = localError.stack;
-    }
+    const json = { error: localError.toJSON(showStack) };
     res.end(JSON.stringify(json));
   } else {
     res.writeHead(res.statusCode, { 'Content-Type': 'text/plain' });
     // noinspection JSCheckFunctionSignatures
     res.end(localError.toString(false) + (showStack ? `\n${localError.stack}` : ''));
   }
+  if (localError.fatal && !localOptions.ignoreFatal) {
+    process.exit(localError.code);
+  }
 };
 
-exports.errorHandler = errorHandler;
+process.on('uncaughtException', (err, origin) => {
+  console.error(`Caught exception: ${err.toString()}\nException origin: ${origin}`);
+  process.exit(err.code);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(reason.code || 1);
+});
+
+exports.makeErrorHandler = makeErrorHandler;
