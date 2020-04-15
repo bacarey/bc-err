@@ -1,6 +1,6 @@
 {
   "name": "bc-err",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "A small 'framework' to simplify and standardize the treatment of errors in Express apps",
   "repository": "https://github.com/bacarey/bc-err",
   "main": "src/index.js",

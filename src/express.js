@@ -47,14 +47,4 @@ const makeErrorHandler = (options) => (err, req, res, next) => {
   }
 };
 
-process.on('uncaughtException', (err, origin) => {
-  console.error(`Caught exception: ${err.toString()}\nException origin: ${origin}`);
-  process.exit(err.code);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(reason.code || 1);
-});
-
 exports.makeErrorHandler = makeErrorHandler;
